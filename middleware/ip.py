@@ -1,6 +1,10 @@
+from django.core.exceptions import ObjectDoesNotExist
+
 from middleware.models import IpAddress, UserIps
 
 import datetime
+
+from user_management.models import User
 
 
 class SaveIpAddressMiddleware:
@@ -9,7 +13,6 @@ class SaveIpAddressMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        self.get_response(request)
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[-1].strip()
@@ -24,6 +27,11 @@ class SaveIpAddressMiddleware:
         )
         ip_address.save()
 
-        UserIps(user=request.user, ip=ip_address).save()
+        response = self.get_response(request)
+        try:
+            User.objects.get(pk=request.user.pk)
+            UserIps(user=request.user, ip=ip_address).save()
+        except ObjectDoesNotExist:
+            pass
 
-        return self.get_response(request)
+        return response
